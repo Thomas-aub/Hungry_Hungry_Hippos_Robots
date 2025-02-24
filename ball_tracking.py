@@ -66,5 +66,3 @@ def detect_spheres_from_stream(stream_url):
 
 # Remplace par l'URL de ta caméra
 detect_spheres_from_stream("http://192.168.135.149:8080/video")
-
-#412030
