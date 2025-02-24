@@ -20,3 +20,13 @@ As part of our Master's degree in Computer Science, our team of five is developi
   - The robots must **identify and collect** them as fast as possible  
 
 ## 🚀
+
+##Envoyer du code Python sur l'ev3dev
+
+###connecter ev3dev a l'ordi
+* telecherger ev3dev device broswer
+* add advice
+** entrer un nom esuite l'@ ip (Ibliss: 192.168.1.178) (Gabriel 192.)
+
+* envoyer le code
+** scp main.py robot@IPROBOT:/home/robot/
