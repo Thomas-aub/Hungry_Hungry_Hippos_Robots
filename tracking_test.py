@@ -79,7 +79,7 @@ def detect_spheres(frame, color):
     return detected_spheres
 
 def detect_qr_code(frame, qr_detector):
-    """Détecte un QR code dans l'image"""
+    """Détecte un QR code dans l'image et retourne ses coordonnées et points"""
     try:
         # Conversion en niveaux de gris
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
@@ -87,6 +87,7 @@ def detect_qr_code(frame, qr_detector):
         # Détection du QR code
         ret_qr, decoded_info, points, _ = qr_detector.detectAndDecodeMulti(gray)
         
+        qr_centers = []
         if ret_qr and points is not None:
             # Dessiner le contour du QR code
             points = points.astype(np.int32)
@@ -100,16 +101,18 @@ def detect_qr_code(frame, qr_detector):
                 # Dessiner le centre du QR code
                 cv2.circle(frame, (center_x, center_y), 5, (255, 0, 0), -1)
                 
-                return [(center_x, center_y, decoded_info[i] if i < len(decoded_info) else "")]
+                qr_centers.append((center_x, center_y, decoded_info[i] if i < len(decoded_info) else ""))
+            
+            return qr_centers, points
         
-        return []
+        return [], None
     
     except Exception as e:
         print(f"Erreur lors de la détection du QR code: {e}")
-        return []
+        return [], None
 
-def print_detections(blue_spheres, orange_spheres, qr_codes):
-    """Affiche les détections dans le terminal"""
+def print_detections(blue_spheres, orange_spheres, qr_codes, qr_points=None):
+    """Affiche les détections dans le terminal et analyse les relations géométriques"""
     # Afficher les balles bleues
     for i, (x, y, _) in enumerate(blue_spheres):
         print(f"{i+1} - Blue ball in x:{x}, y:{y}")
@@ -119,9 +122,17 @@ def print_detections(blue_spheres, orange_spheres, qr_codes):
         print(f"{i+len(blue_spheres)+1} - Red ball in x:{x}, y:{y}")
     
     # Afficher les QR codes
+    qr_center = None
     for i, (x, y, _) in enumerate(qr_codes):
         print(f"{i+len(blue_spheres)+len(orange_spheres)+1} - QRCode in x:{x}, y:{y}")
+        qr_center = (x, y)
     
+    # Si un QR code est détecté, effectuer l'analyse géométrique
+    if qr_center and qr_points:
+        from geometric_analysis import print_geometric_analysis
+        print_geometric_analysis(qr_points, qr_center, blue_spheres, orange_spheres)
+    
+    print("-" * 40)  # Séparateur pour une meilleure lisibilité
     print("-" * 40)  # Séparateur pour une meilleure lisibilité
 
 def detect_objects_from_stream(stream_url, qr_path, interval=1.0):
