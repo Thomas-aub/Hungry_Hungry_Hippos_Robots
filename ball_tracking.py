@@ -9,18 +9,15 @@ upper_orange = np.array([25, 255, 255])
 lower_blue = np.array([80, 100, 50])  
 upper_blue = np.array([120, 255, 255])  
 
-def detect_spheres_from_stream(stream_url):
-    cap = cv2.VideoCapture(stream_url)
-    if not cap.isOpened():
-        print("Erreur: Impossible de se connecter à la caméra.")
-        return
+def detect_spheres_from_stream(stream):
+    
 
     plt.ion()
     fig, ax = plt.subplots()
 
     try:
         while True:
-            ret, frame = cap.read()
+            ret, frame = stream.read()
             if not ret:
                 print("Erreur: Impossible de lire l'image.")
                 break
@@ -60,7 +57,7 @@ def detect_spheres_from_stream(stream_url):
     except KeyboardInterrupt:
         print("\n🚪 Programme arrêté proprement.")
     finally:
-        cap.release()
+        stream.release()
         plt.ioff()
         plt.show()
 
