@@ -204,7 +204,7 @@ def detect_objects_from_stream(stream_url, qr_path, interval=1.0):
 
 if __name__ == "__main__":
     # Paramètres configurables
-    stream_url = "http://192.168.135.149:8080/video"  # URL de la caméra
+    stream_url = "http://192.0.0.4:8080/video"  # URL de la caméra
     qr_path = "QRcode.png"  # Chemin vers l'image QR code de référence
     print_interval = 2.0  # Intervalle entre les affichages (en secondes)
     
