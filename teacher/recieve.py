@@ -4,90 +4,40 @@ import numpy as np
 import struct
 import threading
 import select
+import os
+from datetime import datetime
 
 class Frame:
     def __init__(self,w,h):
         self.mat = np.zeros((h,w,3),dtype=np.uint8)
         self.id = -1
-        self.analysis_result = None  # Nouvel attribut pour stocker les résultats
+        self.analysis_result = None
 
-def incomingFrame(frame, iframe, frame_id):
-    # Analyse l'image et stocke les résultats
-    analyzed_frame, balls_data = analysis(frame)
-    iframe.mat = analyzed_frame
-    iframe.analysis_result = balls_data
-    iframe.id = frame_id
+# Variable globale pour le compteur de frames enregistrées
+frame_counter = 0
+MAX_SAVED_FRAMES = 5
 
-def gotFullData(data_buffer,iframe, frame_id):
-    # Reconstruct the full frame
-    full_data = b''.join([data_buffer[i] for i in sorted(data_buffer)])
-    messageLength = struct.unpack("I",full_data[0:4])[0]
-    frame_data = full_data[4:]
-    if len(frame_data) == messageLength:
-        #do we have all data
-        frame_buffer = np.frombuffer(frame_data, dtype=np.uint8)
-        frame = cv2.imdecode(frame_buffer,1)
-        if frame is not None:
-            # is frame ok
-            incomingFrame(frame,iframe, frame_id)
-
-def captureThread(sock,frame,stopThread,threadRunning):
-    MaximumPacketSize = 1400
-    timeout_ms = 0.01
-    data_buffer = {}
-    current_frame_id = -1
-    threadRunning.set()
-    while not stopThread.is_set():
-        try:
-            read_ready, _, _ = select.select([sock], [], [], timeout_ms)
-            readSet = bool(read_ready)  # True if data is ready to be read
-            if read_ready and readSet:
-                packet, addr = sock.recvfrom(MaximumPacketSize)
-                packet_id, frame_id = struct.unpack('II', packet[:8])
-                payload = packet[8:]
-                if frame_id != current_frame_id:
-                    if current_frame_id != -1:
-                        gotFullData(data_buffer,frame, frame_id)
-                    # Reset buffer for new frame
-                    data_buffer = {}
-                    current_frame_id = frame_id
-                data_buffer[packet_id] = payload
-        except socket.error:
-            continue
-    threadRunning.clear()
-
-def main():
-    stopProgram = threading.Event()
-    stopThread = threading.Event()
-    threadRunning = threading.Event()
-    # Configuration
-    ip = ""  # listen to all interfaces
-    port = 8080
-    # Create UDP socket
-    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    sock.setblocking(False)
-    sock.bind((ip, port))
-    print("Listening for UDP frames...")
-    frame = Frame(100,100)
-    stopProgram.clear()
-    stopThread.clear()
-    thread = threading.Thread(target=captureThread,args = [sock,frame,stopThread,threadRunning], daemon=True)
-    thread.start()
-    while not stopProgram.is_set():
-        if frame is not None:
-            cv2.imshow("Received Frame", frame.mat)
-            
-            # Accès aux données d'analyse
-            if frame.analysis_result:
-                print(f"Balles rouges: {frame.analysis_result['red']}")
-                print(f"Balles bleues: {frame.analysis_result['blue']}")
-    stopThread.set()
-    while threadRunning.is_set(): pass
-    sock.close()
-    cv2.destroyAllWindows()
-
-main()
-
+def save_detected_frame(frame, analysis_result):
+    """Enregistre la frame avec les balles détectées"""
+    global frame_counter
+    
+    if frame_counter >= MAX_SAVED_FRAMES:
+        return
+    
+    # Créer un dossier pour les captures s'il n'existe pas
+    if not os.path.exists('detections'):
+        os.makedirs('detections')
+    
+    # Générer un nom de fichier avec timestamp
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+    filename = f"detections/frame_{timestamp}_{frame_counter}.png"
+    
+    # Sauvegarder l'image
+    cv2.imwrite(filename, frame)
+    print(f"Frame enregistrée: {filename}")
+    
+    # Incrémenter le compteur
+    frame_counter += 1
 
 def analysis(frame):
     """
@@ -156,3 +106,89 @@ def analysis(frame):
                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255,255,255), 1)
     
     return result_frame, detected_balls
+
+def incomingFrame(frame, iframe, frame_id):
+    # Analyse l'image et stocke les résultats
+    analyzed_frame, balls_data = analysis(frame)
+    iframe.mat = analyzed_frame
+    iframe.analysis_result = balls_data
+    iframe.id = frame_id
+    
+    # Enregistrement des premières frames avec détections
+    if any(balls_data.values()):  # Si au moins une balle détectée
+        save_detected_frame(analyzed_frame, balls_data)
+
+def gotFullData(data_buffer,iframe, frame_id):
+    # Reconstruct the full frame
+    full_data = b''.join([data_buffer[i] for i in sorted(data_buffer)])
+    messageLength = struct.unpack("I",full_data[0:4])[0]
+    frame_data = full_data[4:]
+    if len(frame_data) == messageLength:
+        #do we have all data
+        frame_buffer = np.frombuffer(frame_data, dtype=np.uint8)
+        frame = cv2.imdecode(frame_buffer,1)
+        if frame is not None:
+            # is frame ok
+            incomingFrame(frame,iframe, frame_id)
+
+def captureThread(sock,frame,stopThread,threadRunning):
+    MaximumPacketSize = 1400
+    timeout_ms = 0.01
+    data_buffer = {}
+    current_frame_id = -1
+    threadRunning.set()
+    while not stopThread.is_set():
+        try:
+            read_ready, _, _ = select.select([sock], [], [], timeout_ms)
+            readSet = bool(read_ready)  # True if data is ready to be read
+            if read_ready and readSet:
+                packet, addr = sock.recvfrom(MaximumPacketSize)
+                packet_id, frame_id = struct.unpack('II', packet[:8])
+                payload = packet[8:]
+                if frame_id != current_frame_id:
+                    if current_frame_id != -1:
+                        gotFullData(data_buffer,frame, frame_id)
+                    # Reset buffer for new frame
+                    data_buffer = {}
+                    current_frame_id = frame_id
+                data_buffer[packet_id] = payload
+        except socket.error:
+            continue
+    threadRunning.clear()
+
+def main():
+    stopProgram = threading.Event()
+    stopThread = threading.Event()
+    threadRunning = threading.Event()
+    # Configuration
+    ip = ""  # listen to all interfaces
+    port = 8080
+    # Create UDP socket
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    sock.setblocking(False)
+    sock.bind((ip, port))
+    print("Listening for UDP frames...")
+    frame = Frame(100,100)
+    stopProgram.clear()
+    stopThread.clear()
+    thread = threading.Thread(target=captureThread,args = [sock,frame,stopThread,threadRunning], daemon=True)
+    thread.start()
+    while not stopProgram.is_set():
+        if frame is not None:
+            cv2.imshow("Received Frame", frame.mat)
+            
+            # Accès aux données d'analyse
+            if frame.analysis_result:
+                print(f"Balles rouges: {frame.analysis_result['red']}")
+                print(f"Balles bleues: {frame.analysis_result['blue']}")
+                
+        ch = chr(cv2.waitKey(int(1)) & 0xFF)
+        if ch=='q' or ch=='Q': stopProgram.set()
+    
+    stopThread.set()
+    while threadRunning.is_set(): pass
+    sock.close()
+    cv2.destroyAllWindows()
+
+if __name__ == "__main__":
+    main()
