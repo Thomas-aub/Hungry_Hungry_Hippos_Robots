@@ -9,9 +9,13 @@ class Frame:
     def __init__(self,w,h):
         self.mat = np.zeros((h,w,3),dtype=np.uint8)
         self.id = -1
+        self.analysis_result = None  # Nouvel attribut pour stocker les résultats
 
-def incomingFrame(frame,iframe, frame_id):
-    iframe.mat = frame.copy()
+def incomingFrame(frame, iframe, frame_id):
+    # Analyse l'image et stocke les résultats
+    analyzed_frame, balls_data = analysis(frame)
+    iframe.mat = analyzed_frame
+    iframe.analysis_result = balls_data
     iframe.id = frame_id
 
 def gotFullData(data_buffer,iframe, frame_id):
@@ -58,7 +62,6 @@ def main():
     threadRunning = threading.Event()
     # Configuration
     ip = ""  # listen to all interfaces
-    ip = "192.168.1.181"  # listen to specific interface
     port = 8080
     # Create UDP socket
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -73,11 +76,83 @@ def main():
     while not stopProgram.is_set():
         if frame is not None:
             cv2.imshow("Received Frame", frame.mat)
-        ch = chr(cv2.waitKey(int(1)) & 0xFF)
-        if ch=='q' or ch=='Q': stopProgram.set()
+            
+            # Accès aux données d'analyse
+            if frame.analysis_result:
+                print(f"Balles rouges: {frame.analysis_result['red']}")
+                print(f"Balles bleues: {frame.analysis_result['blue']}")
     stopThread.set()
     while threadRunning.is_set(): pass
     sock.close()
     cv2.destroyAllWindows()
 
 main()
+
+
+def analysis(frame):
+    """
+    Analyse une image pour détecter des balles rouges et bleues
+    Retourne un tuple contenant:
+    - L'image annotée avec les détections
+    - Un dictionnaire des positions des balles
+    """
+    # Définition des plages de couleurs HSV (à calibrer selon votre environnement)
+    color_thresholds = {
+        'red': [
+            {'lower': np.array([0, 120, 70]), 'upper': np.array([10, 255, 255])},  # Rouge clair
+            {'lower': np.array([170, 120, 70]), 'upper': np.array([180, 255, 255])}  # Rouge foncé
+        ],
+        'blue': [
+            {'lower': np.array([90, 120, 70]), 'upper': np.array([120, 255, 255])}  # Bleu
+        ]
+    }
+    
+    # Préparation de l'image de résultat
+    result_frame = frame.copy()
+    detected_balls = {'red': [], 'blue': []}
+    
+    # Conversion en HSV et normalisation
+    hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+    hsv[:,:,2] = cv2.equalizeHist(hsv[:,:,2])
+    
+    # Traitement pour chaque couleur
+    for color in color_thresholds:
+        # Création d'un masque combiné pour les différentes plages de la couleur
+        combined_mask = np.zeros(hsv.shape[:2], dtype=np.uint8)
+        for threshold in color_thresholds[color]:
+            mask = cv2.inRange(hsv, threshold['lower'], threshold['upper'])
+            combined_mask = cv2.bitwise_or(combined_mask, mask)
+        
+        # Amélioration du masque
+        kernel = np.ones((5,5), np.uint8)
+        cleaned_mask = cv2.morphologyEx(combined_mask, cv2.MORPH_OPEN, kernel)
+        cleaned_mask = cv2.dilate(cleaned_mask, kernel, iterations=2)
+        
+        # Détection des contours
+        contours, _ = cv2.findContours(cleaned_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        
+        # Filtrage des contours et détection des cercles
+        min_radius = 5
+        max_radius = 100
+        for cnt in contours:
+            area = cv2.contourArea(cnt)
+            if area < 30:  # Filtre les petits artefacts
+                continue
+                
+            (x,y), radius = cv2.minEnclosingCircle(cnt)
+            center = (int(x), int(y))
+            radius = int(radius)
+            
+            if min_radius <= radius <= max_radius:
+                # Valid circle detected
+                detected_balls[color].append((center[0], center[1], radius))
+                
+                # Dessin sur l'image de résultat
+                color_bgr = (0, 0, 255) if color == 'red' else (255, 0, 0)
+                cv2.circle(result_frame, center, radius, color_bgr, 2)
+                cv2.circle(result_frame, center, 2, (0, 255, 0), 3)
+                cv2.putText(result_frame, f"{color} {radius}", 
+                           (center[0]-radius, center[1]-radius-5), 
+                           cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255,255,255), 1)
+    
+    return result_frame, detected_balls
