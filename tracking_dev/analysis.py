@@ -41,15 +41,14 @@ def analysis(frame):
         Utilise des filtres HSV pour détecter les couleurs et applique plusieurs critères:
         - Taille maximale de 25px
         - Circularité minimale de 0.7
-        - Rayon entre 5 et 12 pixels
+        - Rayon entre 5 et 20 pixels
     """
     color_thresholds = {
         'red': [
-            {'lower': np.array([0, 120, 70]), 'upper': np.array([10, 255, 255])},
-            {'lower': np.array([170, 120, 70]), 'upper': np.array([180, 255, 255])}
+            {'lower': np.array([0, 120, 70]), 'upper': np.array([180, 255, 255])},
         ],
         'blue': [
-            {'lower': np.array([90, 120, 70]), 'upper': np.array([120, 255, 255])}
+            {'lower': np.array([90, 90, 70]), 'upper': np.array([120, 255, 255])}
         ]
     }
     
@@ -81,7 +80,7 @@ def analysis(frame):
             x, y, w, h = cv2.boundingRect(cnt)
             
             # Filtrer les objets trop grands (>25px dans les deux dimensions)
-            if w > 25 or h > 25:
+            if w > 50 or h > 50:
                 continue
                 
             # Vérifier la circularité pour identifier les sphères
@@ -98,7 +97,7 @@ def analysis(frame):
             center = (int(x), int(y))
             radius = int(radius)
             
-            if 5 <= radius <= 12:  # Réduire la plage de rayon pour mieux cibler les balles
+            if 5 <= radius <= 20:  # Réduire la plage de rayon pour mieux cibler les balles
                 detected_balls[color].append((center[0], center[1], radius))
                 color_bgr = (0, 0, 255) if color == 'red' else (255, 0, 0)
                 cv2.circle(result_frame, center, radius, color_bgr, 2)
