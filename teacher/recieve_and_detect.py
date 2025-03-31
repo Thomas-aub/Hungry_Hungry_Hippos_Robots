@@ -8,7 +8,23 @@ import os
 from datetime import datetime
 
 class Frame:
+    """
+    Classe représentant une trame vidéo avec résultats d'analyse.
+    
+    Attributs:
+        mat (numpy.ndarray): Matrice contenant les données de l'image
+        id (int): Identifiant unique de la trame
+        analysis_result (dict): Résultats de l'analyse des balles détectées
+        qr_data (tuple): Données du QR code détecté (points, angle, info)
+    """
     def __init__(self, w, h):
+        """
+        Initialise une nouvelle instance de Frame.
+        
+        Args:
+            w (int): Largeur de l'image en pixels
+            h (int): Hauteur de l'image en pixels
+        """
         self.mat = np.zeros((h, w, 3), dtype=np.uint8)
         self.id = -1
         self.analysis_result = None
@@ -20,7 +36,13 @@ MAX_SAVED_FRAMES = 5
 QR_REFERENCE = "QR_Code.jpeg"  # Chemin vers votre QR code de référence
 
 def load_qr_reference():
-    """Charge le QR code de référence pour la comparaison"""
+    """
+    Charge le QR code de référence pour la comparaison.
+    
+    Returns:
+        numpy.ndarray ou None: Image en niveaux de gris du QR code de référence,
+                               ou None si le fichier n'est pas trouvé
+    """
     if not os.path.exists(QR_REFERENCE):
         print(f"Attention: Fichier QR référence {QR_REFERENCE} non trouvé")
         return None
@@ -31,7 +53,18 @@ qr_reference = load_qr_reference()
 qr_detector = cv2.QRCodeDetector()
 
 def detect_and_orient_qr(frame):
-    """Détecte le QR code et détermine son orientation"""
+    """
+    Détecte le QR code dans l'image et détermine son orientation.
+    
+    Args:
+        frame (numpy.ndarray): Image à analyser
+        
+    Returns:
+        tuple: Contenant:
+            - points (numpy.ndarray ou None): Coordonnées des coins du QR code détecté
+            - angle (float ou None): Angle d'orientation du QR code en degrés
+            - info (str ou None): Données décodées du QR code
+    """
     global qr_reference
     
     # Détection des QR codes
@@ -67,7 +100,14 @@ def detect_and_orient_qr(frame):
     return None, None, None
 
 def save_detected_frame(frame, analysis_result, qr_data):
-    """Enregistre la frame avec les détections"""
+    """
+    Enregistre l'image avec les résultats de détection (balles et QR code).
+    
+    Args:
+        frame (numpy.ndarray): Image à enregistrer
+        analysis_result (dict): Résultats de détection des balles
+        qr_data (tuple ou None): Données du QR code détecté (points, angle, info)
+    """
     global frame_counter
     
     if frame_counter >= MAX_SAVED_FRAMES:
@@ -93,7 +133,18 @@ def save_detected_frame(frame, analysis_result, qr_data):
     frame_counter += 1
 
 def analysis(frame):
-    """Analyse une image pour détecter balles et QR code"""
+    """
+    Analyse une image pour détecter les balles colorées et les QR codes.
+    
+    Args:
+        frame (numpy.ndarray): Image à analyser
+        
+    Returns:
+        tuple: Contenant:
+            - result_frame (numpy.ndarray): Image avec annotations des détections
+            - detected_balls (dict): Dictionnaire des balles détectées par couleur
+            - qr_data (tuple ou None): Données du QR code détecté (points, angle, info)
+    """
     # Détection des balles (code existant)
     color_thresholds = {
         'red': [
@@ -168,6 +219,14 @@ def analysis(frame):
     return result_frame, detected_balls, qr_data
 
 def incomingFrame(frame, iframe, frame_id):
+    """
+    Traite une nouvelle trame reçue, effectue l'analyse et met à jour l'objet Frame.
+    
+    Args:
+        frame (numpy.ndarray): Nouvelle image à traiter
+        iframe (Frame): Objet Frame à mettre à jour
+        frame_id (int): Identifiant de la trame
+    """
     analyzed_frame, balls_data, qr_data = analysis(frame)
     iframe.mat = analyzed_frame
     iframe.analysis_result = balls_data
@@ -177,9 +236,12 @@ def incomingFrame(frame, iframe, frame_id):
     if any(balls_data.values()) or qr_data is not None:
         save_detected_frame(analyzed_frame, balls_data, qr_data)
 
-# [Les autres fonctions restent identiques...]
 
 def main():
+    """
+    Fonction principale qui initialise le socket UDP, lance le thread de capture
+    et gère l'affichage des résultats de détection.
+    """
     stopProgram = threading.Event()
     stopThread = threading.Event()
     threadRunning = threading.Event()
