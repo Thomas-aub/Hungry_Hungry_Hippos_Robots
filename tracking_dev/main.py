@@ -1,10 +1,22 @@
-
 import cv2
 import socket
 import threading
 from flux import captureThread, Frame
 
 def main():
+    """
+    Fonction principale du programme de détection de balles.
+    
+    Établit une connexion UDP, initialise un thread de capture,
+    affiche les frames reçues avec les balles détectées,
+    et gère l'arrêt propre du programme.
+    
+    Args:
+        None
+        
+    Returns:
+        None
+    """
     stopProgram = threading.Event()
     stopThread = threading.Event()
     threadRunning = threading.Event()

@@ -1,10 +1,21 @@
-
 import cv2
 import numpy as np
 import os
 from datetime import datetime
 
 def save_detected_frame(frame):
+    """
+    Sauvegarde l'image avec les balles détectées.
+    
+    Args:
+        frame (numpy.ndarray): Image avec les annotations de détection
+        
+    Returns:
+        None
+    
+    Note:
+        Les images sont sauvegardées dans le dossier 'detections' avec un timestamp
+    """
     if not os.path.exists('detections'):
         os.makedirs('detections')
     
@@ -14,6 +25,24 @@ def save_detected_frame(frame):
     print(f"Frame enregistrée: {filename}")
 
 def analysis(frame):
+    """
+    Analyse l'image pour détecter les balles rouges et bleues.
+    
+    Args:
+        frame (numpy.ndarray): Image à analyser
+        
+    Returns:
+        tuple: (image annotée, dictionnaire contenant les positions des balles détectées)
+            - L'image annotée contient les cercles et informations sur les balles détectées
+            - Le dictionnaire est structuré: {'red': [(x1,y1,r1), ...], 'blue': [(x2,y2,r2), ...]}
+              où x,y sont les coordonnées et r est le rayon
+              
+    Note:
+        Utilise des filtres HSV pour détecter les couleurs et applique plusieurs critères:
+        - Taille maximale de 25px
+        - Circularité minimale de 0.7
+        - Rayon entre 5 et 12 pixels
+    """
     color_thresholds = {
         'red': [
             {'lower': np.array([0, 120, 70]), 'upper': np.array([10, 255, 255])},
@@ -80,6 +109,23 @@ def analysis(frame):
     return result_frame, detected_balls
 
 def incomingFrame(frame, iframe, frame_id):
+    """
+    Traite une nouvelle frame reçue du flux vidéo.
+    
+    Args:
+        frame (numpy.ndarray): Image brute reçue du flux
+        iframe (Frame): Objet Frame où stocker les résultats
+        frame_id (int): Identifiant de la frame
+        
+    Returns:
+        None
+        
+    Note:
+        Modifie l'objet iframe en place pour stocker:
+        - L'image analysée avec les annotations (iframe.mat)
+        - Les résultats de détection (iframe.analysis_result)
+        - L'identifiant de frame (iframe.id)
+    """
     analyzed_frame, balls_data = analysis(frame)
     iframe.mat = analyzed_frame
     iframe.analysis_result = balls_data
