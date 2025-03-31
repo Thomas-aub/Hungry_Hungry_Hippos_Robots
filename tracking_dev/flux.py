@@ -5,7 +5,7 @@ import numpy as np
 import cv2
 import threading
 import select
-from tracking import incomingFrame
+from analysis import incomingFrame
 
 class Frame:
     def __init__(self, w, h):
