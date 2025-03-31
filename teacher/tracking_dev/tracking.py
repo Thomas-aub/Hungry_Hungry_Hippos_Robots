@@ -26,11 +26,13 @@ def analysis(frame):
     
     result_frame = frame.copy()
     detected_balls = {'red': [], 'blue': []}
+    
     hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
     hsv[:,:,2] = cv2.equalizeHist(hsv[:,:,2])
     
     for color in color_thresholds:
         combined_mask = np.zeros(hsv.shape[:2], dtype=np.uint8)
+        
         for threshold in color_thresholds[color]:
             mask = cv2.inRange(hsv, threshold['lower'], threshold['upper'])
             combined_mask = cv2.bitwise_or(combined_mask, mask)
@@ -40,21 +42,40 @@ def analysis(frame):
         cleaned_mask = cv2.dilate(cleaned_mask, kernel, iterations=2)
         
         contours, _ = cv2.findContours(cleaned_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        
         for cnt in contours:
             area = cv2.contourArea(cnt)
             if area < 30:
                 continue
+                
+            # Calculer dimensions du rectangle englobant
+            x, y, w, h = cv2.boundingRect(cnt)
+            
+            # Filtrer les objets trop grands (>25px dans les deux dimensions)
+            if w > 25 or h > 25:
+                continue
+                
+            # Vérifier la circularité pour identifier les sphères
+            perimeter = cv2.arcLength(cnt, True)
+            circularity = 0
+            if perimeter > 0:
+                circularity = 4 * np.pi * area / (perimeter * perimeter)
+            
+            # Filtre pour les objets circulaires (les sphères ont une circularité proche de 1)
+            if circularity < 0.7:  # Un seuil de 0.7 est généralement bon pour les cercles
+                continue
+            
             (x, y), radius = cv2.minEnclosingCircle(cnt)
             center = (int(x), int(y))
             radius = int(radius)
             
-            if 5 <= radius <= 100:
+            if 5 <= radius <= 12:  # Réduire la plage de rayon pour mieux cibler les balles
                 detected_balls[color].append((center[0], center[1], radius))
                 color_bgr = (0, 0, 255) if color == 'red' else (255, 0, 0)
                 cv2.circle(result_frame, center, radius, color_bgr, 2)
                 cv2.circle(result_frame, center, 2, (0, 255, 0), 3)
-                cv2.putText(result_frame, f"{color} {radius}", (center[0]-radius, center[1]-radius-5), 
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255,255,255), 1)
+                cv2.putText(result_frame, f"{color} {radius}", (center[0]-radius, center[1]-radius-5),
+                           cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255,255,255), 1)
     
     return result_frame, detected_balls
 
