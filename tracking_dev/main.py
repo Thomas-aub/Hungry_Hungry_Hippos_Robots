@@ -31,7 +31,7 @@ def main():
     sock.bind((ip, port))
     
     print("Listening for UDP frames...")
-    frame = Frame(100, 100)
+    frame = Frame(200, 200)
     stopProgram.clear()
     stopThread.clear()
     

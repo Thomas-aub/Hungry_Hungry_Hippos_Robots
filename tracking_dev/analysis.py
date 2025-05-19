@@ -38,6 +38,13 @@ def load_reference_qr_code(filename="QR_Code.jpeg"):
     
     return reference_data
 
+def preprocess_for_qr(image):
+    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    sharpened = cv2.GaussianBlur(gray, (0, 0), 3)
+    sharpened = cv2.addWeighted(gray, 1.5, sharpened, -0.5, 0)
+    return sharpened
+
+
 # Variable globale pour stocker les données de référence du QR code
 REFERENCE_QR_CODE = load_reference_qr_code()
 
@@ -57,7 +64,10 @@ def detect_qr_code(frame):
         return False, None, None
     
     # Convertir en niveaux de gris pour la détection
-    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    scale = 2  # ou 3
+    resized_frame = cv2.resize(frame, None, fx=scale, fy=scale)
+    gray = preprocess_for_qr(resized_frame)
+
     
     # Détecter le QR code
     qcd = cv2.QRCodeDetector()
