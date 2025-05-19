@@ -21,31 +21,27 @@ from datetime import datetime
 # Chargement QR de référence
 ############################
 def load_reference_qr_code(filename="QR_Code.jpeg"):
-    """
-    Charge le QR code de référence et en extrait le contenu
-
-    Args:
-        filename (str): chemin vers l'image du QR code
-
-    Returns:
-        dict: Contenu et image du QR code de référence
-    """
+    """Charge le QR code de référence"""
     reference_img = cv2.imread(filename)
     if reference_img is None:
         print(f"Erreur: Impossible de charger l'image {filename}")
         return None
 
-    gray = cv2.cvtColor(reference_img, cv2.COLOR_BGR2GRAY)
+    # Détection multiple pour les QR codes composites
     qcd = cv2.QRCodeDetector()
-    retval, decoded_info, _, _ = qcd.detectAndDecodeMulti(gray)
-
+    retval, decoded_info, _, _ = qcd.detectAndDecodeMulti(reference_img)
+    
     if not retval:
-        print("Aucun QR code trouvé dans l'image de référence")
-        return None
+        # Essayer avec prétraitement si l'image est difficile
+        processed = preprocess_for_qr(reference_img)
+        retval, decoded_info, _, _ = qcd.detectAndDecodeMulti(processed)
+        
+        if not retval:
+            print("Aucun QR code trouvé dans l'image de référence")
+            return None
 
+    print(f"QR code de référence chargé: {decoded_info}")
     return {'content': decoded_info, 'image': reference_img}
-
-
 REFERENCE_QR_CODE = load_reference_qr_code()
 
 
@@ -53,124 +49,90 @@ REFERENCE_QR_CODE = load_reference_qr_code()
 # Prétraitement de l'image
 ############################
 def preprocess_for_qr(image):
-    """
-    Prépare l'image pour une meilleure détection de QR code : contraste, netteté, adaptatif.
-    """
+    """Prépare l'image pour une meilleure détection de QR code"""
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-
-    # Histogramme adaptatif (CLAHE)
-    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
-    gray = clahe.apply(gray)
-
-    # Amélioration de la netteté
-    blurred = cv2.GaussianBlur(gray, (0, 0), sigmaX=3)
-    sharpened = cv2.addWeighted(gray, 1.5, blurred, -0.5, 0)
-
-    return sharpened
-
-def warp_candidate_region(gray, box, size=300):
-    """
-    Corrige la perspective d'une région candidate pour lecture du QR code.
-
-    Args:
-        gray (np.ndarray): Image en niveaux de gris
-        box (np.ndarray): 4 points de contour (shape: 4x1x2)
-        size (int): Taille de sortie normalisée (pixels carrés)
-
-    Returns:
-        np.ndarray: ROI redressée
-    """
-    pts = box.reshape(4, 2).astype(np.float32)
     
-    # Ordre: top-left, top-right, bottom-right, bottom-left
-    s = pts.sum(axis=1)
-    diff = np.diff(pts, axis=1)
-    ordered = np.array([
-        pts[np.argmin(s)],
-        pts[np.argmin(diff)],
-        pts[np.argmax(s)],
-        pts[np.argmax(diff)]
-    ], dtype=np.float32)
-
-    dst = np.array([
-        [0, 0],
-        [size - 1, 0],
-        [size - 1, size - 1],
-        [0, size - 1]
-    ], dtype=np.float32)
-
-    M = cv2.getPerspectiveTransform(ordered, dst)
-    warped = cv2.warpPerspective(gray, M, (size, size))
-    return warped
-
-
-
+    # Égalisation d'histogramme adaptative
+    clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8,8))
+    enhanced = clahe.apply(gray)
+    
+    # Démélangeage (débruitage)
+    denoised = cv2.fastNlMeansDenoising(enhanced, None, h=10, templateWindowSize=7, searchWindowSize=21)
+    
+    # Amélioration du contraste
+    alpha = 1.5  # Contraste (1.0-3.0)
+    beta = 0     # Luminosité (0-100)
+    adjusted = cv2.convertScaleAbs(denoised, alpha=alpha, beta=beta)
+    
+    # Binarisation adaptative
+    binary = cv2.adaptiveThreshold(adjusted, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, 
+                                 cv2.THRESH_BINARY, 11, 2)
+    
+    return binary
 
 def detect_qr_code(frame, debug_display=False):
-    """
-    Détecte un QR code même vu en perspective, en cherchant les zones blanches dans l'image.
-
-    Args:
-        frame (np.ndarray): Image couleur
-        debug_display (bool): Si True, affiche un point rose sur chaque candidat
-
-    Returns:
-        tuple: (détecté: bool, points: np.ndarray ou None, contenu: str ou None)
-    """
+    """Détecte un QR code même vu en perspective"""
     if REFERENCE_QR_CODE is None:
+        print("Aucun QR code de référence chargé")
         return False, None, None
 
-    scale = 2
-    resized = cv2.resize(frame, None, fx=scale, fy=scale)
-    gray = preprocess_for_qr(resized)
-
-    # 1. Détection directe classique
+    # 1. Essayer d'abord la détection directe
     qcd = cv2.QRCodeDetector()
-    retval, decoded_info, points, _ = qcd.detectAndDecodeMulti(gray)
+    retval, decoded_info, points, _ = qcd.detectAndDecodeMulti(frame)
+    
+    # Ajout du log ici
+    print(f"Détection directe - Résultat: {retval}, Contenu: {decoded_info}")
+    
     if retval:
         for i, content in enumerate(decoded_info):
             if content and content in REFERENCE_QR_CODE['content']:
-                pts = (points[i] / scale).astype(np.int32)
-                return True, pts, content
+                print(f"QR code reconnu (méthode directe): {content}")
+                return True, points[i], content
 
-    # 2. Recherche de zones blanches (luminance élevée)
-    _, white_mask = cv2.threshold(gray, 220, 255, cv2.THRESH_BINARY)
-    kernel = np.ones((5, 5), np.uint8)
-    white_mask = cv2.morphologyEx(white_mask, cv2.MORPH_CLOSE, kernel)
+    # 2. Si échec, essayer avec prétraitement amélioré
+    processed = preprocess_for_qr(frame)
+    retval, decoded_info, points, _ = qcd.detectAndDecodeMulti(processed)
+    
+    # Ajout du log ici aussi
+    print(f"Détection avec prétraitement - Résultat: {retval}, Contenu: {decoded_info}")
+    
+    if retval:
+        for i, content in enumerate(decoded_info):
+            if content and content in REFERENCE_QR_CODE['content']:
+                print(f"QR code reconnu (avec prétraitement): {content}")
+                return True, points[i], content
 
-    contours, _ = cv2.findContours(white_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-
+    # 3. Dernier recours: recherche de motifs carrés
+    if debug_display:
+        debug_img = frame.copy()
+    
+    # Trouver les contours dans l'image prétraitée
+    contours, _ = cv2.findContours(processed, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+    
     for cnt in contours:
-        area = cv2.contourArea(cnt)
-        if area < 1000 or area > 50000:
-            continue
-
-        x, y, w, h = cv2.boundingRect(cnt)
-        roi = gray[y:y+h, x:x+w]
-        roi = cv2.resize(roi, (300, 300))
-        content, _, _ = qcd.detectAndDecode(roi)
-
-        if content and content in REFERENCE_QR_CODE['content']:
-            # Retourner les 4 coins estimés du rectangle
-            points = np.array([
-                [x, y],
-                [x + w, y],
-                [x + w, y + h],
-                [x, y + h]
-            ], dtype=np.float32) / scale
-            return True, points, content
-
-        if debug_display:
-            # Dessiner un point rose au centre du contour candidat
-            M = cv2.moments(cnt)
-            if M["m00"] != 0:
-                cx = int(M["m10"] / M["m00"] / scale)
-                cy = int(M["m01"] / M["m00"] / scale)
-                cv2.circle(frame, (cx, cy), 6, (255, 0, 255), -1)
-
+        # Approximer le contour
+        epsilon = 0.02 * cv2.arcLength(cnt, True)
+        approx = cv2.approxPolyDP(cnt, epsilon, True)
+        
+        # Nous cherchons des quadrilatères (4 côtés)
+        if len(approx) == 4:
+            # Vérifier la convexité et la surface raisonnable
+            area = cv2.contourArea(approx)
+            if 1000 < area < 50000 and cv2.isContourConvex(approx):
+                # Essayer de lire le QR code dans cette région
+                warped = warp_candidate_region(processed, approx)
+                content, _, _ = qcd.detectAndDecode(warped)
+                
+                if content and content in REFERENCE_QR_CODE['content']:
+                    return True, approx.reshape(4, 2), content
+                
+                if debug_display:
+                    cv2.drawContours(debug_img, [approx], -1, (0, 255, 255), 2)
+    
+    if debug_display:
+        cv2.imshow("QR Debug", debug_img)
+    
     return False, None, None
-
-
 
 
 ############################
