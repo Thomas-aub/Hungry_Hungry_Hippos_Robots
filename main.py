@@ -16,7 +16,8 @@ def main():
         while True:
             frame = rx.get_frame()
             if frame is not None:
-                annotated, _ = analysis.analyze_frame(frame)
+                result = analysis.analyze_frame(frame)
+                annotated = result.annotated
                 cv2.imshow("Robot lab", annotated)
 
             if cv2.waitKey(1) & 0xFF in (ord("q"), ord("Q")):
