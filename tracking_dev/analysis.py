@@ -48,7 +48,7 @@ def analysis(frame):
             {'lower': np.array([0, 120, 70]), 'upper': np.array([30, 255, 255])},
         ],
         'blue': [
-            {'lower': np.array([90, 35, 40]), 'upper': np.array([240, 255, 255])}
+            {'lower': np.array([100, 50, 40]), 'upper': np.array([240, 255, 255])}
         ]
     }
     
