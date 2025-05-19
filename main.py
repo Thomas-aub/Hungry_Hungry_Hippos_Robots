@@ -1,6 +1,31 @@
-from mouvement import move
-from tracking_dev import analysis, aruco, main
+"""
+main.py — point d’entrée
+Récupère l’image → l’analyse → (optionnel) l’affiche ou l’envoie au robot
+"""
+import cv2, threading
+from flux import UdpFrameReceiver
+import analysis
 
 
+def main():
+    rx = UdpFrameReceiver(port=8080)
+    rx.start()
+    print("Listening on UDP port 8080 — press Q to quit")
 
-move.traball(0, move.distance())
+    try:
+        while True:
+            frame = rx.get_frame()
+            if frame is not None:
+                annotated, _ = analysis.analyze_frame(frame)
+                cv2.imshow("Robot lab", annotated)
+
+            if cv2.waitKey(1) & 0xFF in (ord("q"), ord("Q")):
+                break
+
+    finally:
+        rx.stop()
+        cv2.destroyAllWindows()
+
+
+if __name__ == "__main__":
+    main()
