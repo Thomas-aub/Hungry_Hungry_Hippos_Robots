@@ -1,20 +1,12 @@
 import cv2
 import numpy as np
 import os
+import math
 from datetime import datetime
 
 def save_detected_frame(frame):
     """
-    Sauvegarde l'image avec les balles détectées et les marqueurs ArUco.
-    
-    Args:
-        frame (numpy.ndarray): Image avec les annotations de détection
-        
-    Returns:
-        None
-    
-    Note:
-        Les images sont sauvegardées dans le dossier 'detections' avec un timestamp
+    Sauvegarde l'image avec les détections.
     """
     if not os.path.exists('detections'):
         os.makedirs('detections')
@@ -24,31 +16,90 @@ def save_detected_frame(frame):
     cv2.imwrite(filename, frame)
     print(f"Frame enregistrée: {filename}")
 
-def analysis(frame):
+def calculate_distance(point1, point2):
     """
-    Analyse l'image pour détecter les balles rouges, bleues et le marqueur ArUco (DICT_6X6_50, id:10).
+    Calcule la distance euclidienne entre deux points.
     
     Args:
-        frame (numpy.ndarray): Image à analyser
+        point1 (tuple): (x1, y1)
+        point2 (tuple): (x2, y2)
         
     Returns:
-        tuple: (image annotée, dictionnaire contenant les positions des balles et du marqueur ArUco détectés)
-            - L'image annotée contient les cercles et informations sur les balles détectées et le marqueur ArUco
-            - Le dictionnaire est structuré: {
-                  'red': [(x1,y1,r1), ...], 
-                  'blue': [(x2,y2,r2), ...],
-                  'aruco': {'id10': {'corners': [...], 'center': (x,y)}}
-              où x,y sont les coordonnées et r est le rayon
-              
-    Note:
-        Pour les balles:
-        - Utilise des filtres HSV pour détecter les couleurs
-        - Taille maximale de 25px
-        - Circularité minimale de 0.5
-        - Rayon entre 5 et 20 pixels
+        float: Distance entre les points
+    """
+    return math.sqrt((point2[0] - point1[0])**2 + (point2[1] - point1[1])**2)
+
+def find_nearest_ball(aruco_center, balls_data):
+    """
+    Trouve la balle la plus proche du marqueur ArUco.
+    
+    Args:
+        aruco_center (tuple): Centre du marqueur ArUco (x, y)
+        balls_data (dict): Dictionnaire contenant les données des balles
         
-        Pour l'ArUco:
-        - Détecte uniquement le marqueur avec id=10 du dictionnaire DICT_6X6_50
+    Returns:
+        tuple: (ball_type, ball_info, distance) ou (None, None, None) si aucune balle
+    """
+    nearest_ball = None
+    min_distance = float('inf')
+    ball_type = None
+    
+    for color in ['red', 'blue']:
+        for ball in balls_data[color]:
+            ball_center = (ball[0], ball[1])
+            distance = calculate_distance(aruco_center, ball_center)
+            
+            if distance < min_distance:
+                min_distance = distance
+                nearest_ball = ball
+                ball_type = color
+    
+    return (ball_type, nearest_ball, min_distance) if nearest_ball else (None, None, None)
+
+def display_distance_info(frame, aruco_center, ball_type, ball_info, distance):
+    """
+    Affiche les informations de distance sur l'image.
+    
+    Args:
+        frame: Image sur laquelle dessiner
+        aruco_center: Centre du marqueur ArUco
+        ball_type: Type de balle ('red' ou 'blue')
+        ball_info: Informations de la balle (x, y, radius)
+        distance: Distance entre l'ArUco et la balle
+    """
+    if ball_info is None:
+        return
+    
+    ball_center = (ball_info[0], ball_info[1])
+    
+    # Dessiner la ligne entre l'ArUco et la balle
+    cv2.line(frame, aruco_center, ball_center, (0, 255, 255), 2)
+    
+    # Calculer le point milieu pour afficher la distance
+    mid_point = (
+        (aruco_center[0] + ball_center[0]) // 2,
+        (aruco_center[1] + ball_center[1]) // 2
+    )
+    
+    # Afficher les informations
+    info_text = f"Dist: {distance:.1f}px"
+    cv2.putText(frame, info_text, (mid_point[0]-40, mid_point[1]), 
+               cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 2)
+    
+    # Afficher les coordonnées
+    cv2.putText(frame, f"ArUco: {aruco_center}", (10, 20), 
+               cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 1)
+    cv2.putText(frame, f"{ball_type} ball: {ball_center}", (10, 40), 
+               cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 1)
+    
+    # Afficher dans la console
+    print(f"\nArUco position: {aruco_center}")
+    print(f"Nearest ball: {ball_type} at {ball_center}")
+    print(f"Distance: {distance:.1f} pixels")
+
+def analysis(frame):
+    """
+    Analyse l'image pour détecter les balles et l'ArUco, et trouve la balle la plus proche.
     """
     color_thresholds = {
         'red': [
@@ -62,7 +113,7 @@ def analysis(frame):
     result_frame = frame.copy()
     detected_balls = {'red': [], 'blue': [], 'aruco': {}}
     
-    # Détection des balles (code existant)
+    # Détection des balles
     hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
     hsv[:,:,2] = cv2.equalizeHist(hsv[:,:,2])
     
@@ -84,20 +135,15 @@ def analysis(frame):
             if area < 30:
                 continue
                 
-            # Calculer dimensions du rectangle englobant
             x, y, w, h = cv2.boundingRect(cnt)
-            
-            # Filtrer les objets trop grands (>25px dans les deux dimensions)
             if w > 50 or h > 50:
                 continue
                 
-            # Vérifier la circularité pour identifier les sphères
             perimeter = cv2.arcLength(cnt, True)
             circularity = 0
             if perimeter > 0:
                 circularity = 4 * np.pi * area / (perimeter * perimeter)
             
-            # Filtre pour les objets circulaires (les sphères ont une circularité proche de 1)
             if circularity < 0.5:
                 continue
             
@@ -105,7 +151,7 @@ def analysis(frame):
             center = (int(x), int(y))
             radius = int(radius)
             
-            if  3 <= radius <= 25:
+            if 3 <= radius <= 25:
                 detected_balls[color].append((center[0], center[1], radius))
                 color_bgr = (0, 0, 255) if color == 'red' else (255, 0, 0)
                 cv2.circle(result_frame, center, radius, color_bgr, 2)
@@ -113,7 +159,7 @@ def analysis(frame):
                 cv2.putText(result_frame, f"{color} {radius}", (center[0]-radius, center[1]-radius-5),
                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255,255,255), 1)
     
-    # Détection du marqueur ArUco (nouveau code)
+    # Détection de l'ArUco
     aruco_dict = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_6X6_50)
     parameters = cv2.aruco.DetectorParameters()
     detector = cv2.aruco.ArucoDetector(aruco_dict, parameters)
@@ -122,43 +168,41 @@ def analysis(frame):
     
     if ids is not None:
         for i in range(len(ids)):
-            if ids[i] == 10:  # Nous ne nous intéressons qu'au marqueur avec id=10
-                # Dessiner le marqueur détecté
+            if ids[i] == 10:
                 cv2.aruco.drawDetectedMarkers(result_frame, [corners[i]], np.array([ids[i]]))
                 
-                # Calculer le centre du marqueur
                 center = corners[i][0].mean(axis=0)
                 center = tuple(map(int, center))
                 
-                # Stocker les informations dans le dictionnaire
                 detected_balls['aruco']['id10'] = {
                     'corners': corners[i][0].tolist(),
                     'center': center
                 }
                 
-                # Ajouter un texte avec l'ID
                 cv2.putText(result_frame, f"ArUco ID:10", (center[0]-20, center[1]-20),
                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 2)
+                
+                # Trouver la balle la plus proche
+                ball_type, ball_info, distance = find_nearest_ball(
+                    center, 
+                    detected_balls
+                )
+                
+                # Afficher les informations de distance
+                if ball_info is not None:
+                    display_distance_info(
+                        result_frame, 
+                        center, 
+                        ball_type, 
+                        ball_info, 
+                        distance
+                    )
     
     return result_frame, detected_balls
 
 def incomingFrame(frame, iframe, frame_id):
     """
     Traite une nouvelle frame reçue du flux vidéo.
-    
-    Args:
-        frame (numpy.ndarray): Image brute reçue du flux
-        iframe (Frame): Objet Frame où stocker les résultats
-        frame_id (int): Identifiant de la frame
-        
-    Returns:
-        None
-        
-    Note:
-        Modifie l'objet iframe en place pour stocker:
-        - L'image analysée avec les annotations (iframe.mat)
-        - Les résultats de détection (iframe.analysis_result)
-        - L'identifiant de frame (iframe.id)
     """
     analyzed_frame, balls_data = analysis(frame)
     iframe.mat = analyzed_frame
