@@ -115,24 +115,3 @@ def show_results_interactive(image_path):
             break
     
     cv2.destroyAllWindows()
-
-if __name__ == "__main__":
-    if len(sys.argv) < 2:
-        print("Usage:")
-        print("  python testing.py image.jpg              # Tester une seule image")
-        print("  python testing.py --folder images/       # Tester toutes les images d'un dossier")
-        print("  python testing.py --interactive image.jpg # Afficher résultat interactif")
-        sys.exit(1)
-    
-    if sys.argv[1] == "--folder":
-        if len(sys.argv) < 3:
-            print("Erreur: Spécifiez un dossier")
-            sys.exit(1)
-        test_multiple_images(sys.argv[2])
-    elif sys.argv[1] == "--interactive":
-        if len(sys.argv) < 3:
-            print("Erreur: Spécifiez une image")
-            sys.exit(1)
-        show_results_interactive(sys.argv[2])
-    else:
-        test_single_image(sys.argv[1])
