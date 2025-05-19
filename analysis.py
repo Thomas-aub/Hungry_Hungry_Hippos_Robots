@@ -82,7 +82,7 @@ def _postprocess_mask(mask: np.ndarray) -> np.ndarray:
 
 def detect_balls(frame: np.ndarray) -> Dict[str, List[Ball]]:
     hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
-    hsv = _equalize_value_channel(hsv)
+    hsv[:,:,2] = cv2.equalizeHist(hsv[:,:,2])
     detected: Dict[str, List[Ball]] = {"red": [], "blue": []}
     
     for color in detected:
