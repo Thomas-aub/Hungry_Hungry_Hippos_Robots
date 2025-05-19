@@ -31,7 +31,7 @@ def test_single_image(image_path):
         return
     
     # Appliquer l'analyse
-    result_frame, detected_balls = analysis(frame)
+    result_frame, detected_balls,  = analysis(frame)
     
     # Afficher les résultats
     print(f"Image: {image_path}")
