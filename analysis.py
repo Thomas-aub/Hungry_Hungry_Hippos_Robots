@@ -137,6 +137,7 @@ def find_nearest_ball(aruco_center: Tuple[int, int], balls: Dict[str, List[Ball]
                 min_dist = d
                 direction = compute_direction(aruco_center, (b.x, b.y))
                 nearest = TargetInfo(color=color, ball=b, distance_px=d, direction_deg=direction)
+                
     return nearest
 
 # ---------------------------------------------------------------------------

@@ -5,7 +5,7 @@ Récupère l’image → l’analyse → (optionnel) l’affiche ou l’envoie a
 import cv2, threading
 from flux import UdpFrameReceiver
 import analysis
-
+import  move 
 
 def main():
     rx = UdpFrameReceiver(port=8080)
@@ -19,7 +19,6 @@ def main():
                 result = analysis.analyze_frame(frame)
                 annotated = result.annotated
                 cv2.imshow("Robot lab", annotated)
-
             if cv2.waitKey(1) & 0xFF in (ord("q"), ord("Q")):
                 break
 
