@@ -1,7 +1,7 @@
 import socket
 
 # Infos sur le serveur (remplacer par l'IP Et le port du serveur)
-target_host = "192.168.178.73"
+target_host = "10.42.0.1"
 target_port = 27700
 
 # create a socket

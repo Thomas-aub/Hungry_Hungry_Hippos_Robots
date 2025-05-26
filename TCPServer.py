@@ -1,7 +1,7 @@
 import socket
 import threading
 
-bind_ip = "192.168.178.73" # Replace this with your own IP address
+bind_ip = "10.42.0.1" # Replace this with your own IP address
 bind_port = 27700 # Feel free to change this port
 # create and bind a new socket
 server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
