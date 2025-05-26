@@ -57,7 +57,7 @@ _COLOR_THRESHOLDS = {
 }
 
 _ARUCO_DICT = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_6X6_50)
-_ARUCO_ID = 10
+_ARUCO_ID = 71 # 72, 73, 74
 _KERNEL = np.ones((5, 5), np.uint8)
 
 # ---------------------------------------------------------------------------
