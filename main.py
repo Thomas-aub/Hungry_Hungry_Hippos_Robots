@@ -5,7 +5,7 @@ Récupère l’image → l’analyse → (optionnel) l’affiche ou l’envoie a
 import cv2, threading
 from flux import UdpFrameReceiver
 import analysis
-import move
+# import move
 
 
 def main():
@@ -19,9 +19,11 @@ def main():
             if frame is not None:
                 result = analysis.analyze_frame(frame)
                 annotated = result.annotated
+                """"
                 file = move.generate(result)
                 if file:
                     move.send(file)
+                """
                 cv2.imshow("Robot lab", annotated)
 
             if cv2.waitKey(1) & 0xFF in (ord("q"), ord("Q")):

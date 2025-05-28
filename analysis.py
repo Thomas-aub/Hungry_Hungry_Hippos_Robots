@@ -1,9 +1,10 @@
 """
-analysis.py — Computer‑vision utilities for the EV3 ball‑fetch project.
+analysis.py — Computer-vision utilities for the EV3 ball-fetch project.
 
-Updated using the improved detection logic provided by the user.
-Modular and easily integrable with movement logic.
+Detects red and blue balls, and two ArUco markers (Gabriel and Isis).
+Computes direction and distance to the nearest ball from each marker.
 """
+
 from __future__ import annotations
 
 import cv2
@@ -15,7 +16,7 @@ from typing import Dict, List, Optional, Tuple
 from dataclasses import dataclass
 
 # ---------------------------------------------------------------------------
-# Data structures
+# Data Structures
 # ---------------------------------------------------------------------------
 
 @dataclass(frozen=True)
@@ -40,36 +41,31 @@ class TargetInfo:
 @dataclass
 class AnalysisResult:
     balls: Dict[str, List[Ball]]
-    aruco: Optional[ArucoMarker]
-    target: Optional[TargetInfo]
+    aruco_gabriel: Optional[ArucoMarker]
+    aruco_isis: Optional[ArucoMarker]
+    target_gabriel: Optional[TargetInfo]
+    target_isis: Optional[TargetInfo]
     annotated: Optional[np.ndarray] = None
 
 # ---------------------------------------------------------------------------
 # Parameters
 # ---------------------------------------------------------------------------
+
 _COLOR_THRESHOLDS = {
-    'red': [
-        {'lower': np.array([0, 120, 70]), 'upper': np.array([30, 255, 255])},
-    ],
-    'blue': [
-        {'lower': np.array([100, 50, 40]), 'upper': np.array([240, 255, 255])}
-    ]
+    'red': [{'lower': np.array([0, 120, 70]), 'upper': np.array([30, 255, 255])}],
+    'blue': [{'lower': np.array([100, 50, 40]), 'upper': np.array([240, 255, 255])}]
 }
 
-_ARUCO_DICT = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_6X6_50)
-_ARUCO_ID = 71 # 72, 73, 74
+_ARUCO_DICT = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_6X6_1000)
+_ARUCO_ID_GABRIEL = 71
+_ARUCO_ID_ISIS = 74
 _KERNEL = np.ones((5, 5), np.uint8)
 
 # ---------------------------------------------------------------------------
-# Core detection and analysis logic
+# Detection Logic
 # ---------------------------------------------------------------------------
 
-def _equalize_value_channel(hsv):
-    hsv = hsv.copy()
-    hsv[:,:,2] = cv2.equalizeHist(hsv[:,:,2])
-    return hsv
-
-def _create_mask(hsv, color: str) -> np.ndarray:
+def _create_mask(hsv: np.ndarray, color: str) -> np.ndarray:
     combined_mask = np.zeros(hsv.shape[:2], dtype=np.uint8)
     for threshold in _COLOR_THRESHOLDS[color]:
         mask = cv2.inRange(hsv, threshold['lower'], threshold['upper'])
@@ -82,9 +78,9 @@ def _postprocess_mask(mask: np.ndarray) -> np.ndarray:
 
 def detect_balls(frame: np.ndarray) -> Dict[str, List[Ball]]:
     hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
-    hsv[:,:,2] = cv2.equalizeHist(hsv[:,:,2])
+    hsv[:, :, 2] = cv2.equalizeHist(hsv[:, :, 2])
     detected: Dict[str, List[Ball]] = {"red": [], "blue": []}
-    
+
     for color in detected:
         mask = _create_mask(hsv, color)
         mask = _postprocess_mask(mask)
@@ -106,24 +102,38 @@ def detect_balls(frame: np.ndarray) -> Dict[str, List[Ball]]:
                 detected[color].append(Ball(int(cx), int(cy), int(radius), color))
     return detected
 
-def detect_aruco(frame: np.ndarray) -> Optional[ArucoMarker]:
+def detect_arucos(frame: np.ndarray) -> Tuple[Optional[ArucoMarker], Optional[ArucoMarker]]:
     parameters = cv2.aruco.DetectorParameters()
     detector = cv2.aruco.ArucoDetector(_ARUCO_DICT, parameters)
     corners, ids, _ = detector.detectMarkers(frame)
+
+    marker_gabriel = None
+    marker_isis = None
+
+    print(ids)
     if ids is not None:
+        ids = ids.flatten()
         for i, marker_id in enumerate(ids):
-            if marker_id == _ARUCO_ID:
-                center = corners[i][0].mean(axis=0)
-                center = tuple(map(int, center))
-                return ArucoMarker(int(marker_id), center)
-    return None
+            center = corners[i][0].mean(axis=0)
+            center = tuple(map(int, center))
+            if marker_id == _ARUCO_ID_GABRIEL:
+                marker_gabriel = ArucoMarker(int(marker_id), center)
+            elif marker_id == _ARUCO_ID_ISIS:
+                marker_isis = ArucoMarker(int(marker_id), center)
+    print("Gabriel :", marker_gabriel)
+    print("Isis :", marker_isis)
+    return marker_gabriel, marker_isis
+
+# ---------------------------------------------------------------------------
+# Utility Functions
+# ---------------------------------------------------------------------------
 
 def euclidean(p1: Tuple[int, int], p2: Tuple[int, int]) -> float:
     return math.hypot(p2[0] - p1[0], p2[1] - p1[1])
 
 def compute_direction(origin: Tuple[int, int], target: Tuple[int, int]) -> float:
     dx = target[0] - origin[0]
-    dy = origin[1] - target[1]  # image y-axis goes down
+    dy = origin[1] - target[1]
     angle = math.degrees(math.atan2(dy, dx))
     return (angle + 360) % 360
 
@@ -140,7 +150,7 @@ def find_nearest_ball(aruco_center: Tuple[int, int], balls: Dict[str, List[Ball]
     return nearest
 
 # ---------------------------------------------------------------------------
-# Visualization and final wrapper
+# Visualization
 # ---------------------------------------------------------------------------
 
 def _draw_annotations(frame: np.ndarray, result: AnalysisResult) -> np.ndarray:
@@ -153,35 +163,60 @@ def _draw_annotations(frame: np.ndarray, result: AnalysisResult) -> np.ndarray:
             cv2.putText(img, f"{b.color} {b.r}", (b.x - b.r, b.y - b.r - 5),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
 
-    if result.aruco:
-        center = result.aruco.center
-        cv2.putText(img, f"ArUco ID:{_ARUCO_ID}", (center[0]-20, center[1]-20),
+    if result.aruco_gabriel:
+        center = result.aruco_gabriel.center
+        cv2.putText(img, f"Gabriel ({result.aruco_gabriel.marker_id})", (center[0]-20, center[1]-20),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 2)
-        cv2.circle(img, center, 4, (0, 255, 255), -1)
+        cv2.circle(img, center, 8, (0, 255, 255), 2)
 
-    if result.target:
-        ac = result.aruco.center
-        bc = (result.target.ball.x, result.target.ball.y)
+    if result.aruco_isis:
+        center = result.aruco_isis.center
+        cv2.putText(img, f"Isis ({result.aruco_isis.marker_id})", (center[0]-20, center[1]-20),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 0), 2)
+        cv2.circle(img, center, 8, (255, 255, 0), 2)
+
+    if result.target_gabriel and result.aruco_gabriel:
+        ac = result.aruco_gabriel.center
+        bc = (result.target_gabriel.ball.x, result.target_gabriel.ball.y)
         cv2.line(img, ac, bc, (0, 255, 255), 2)
+        text = f"G → {result.target_gabriel.color} | {result.target_gabriel.distance_px:.0f}px | {result.target_gabriel.direction_deg:.1f}°"
         mid = ((ac[0] + bc[0]) // 2, (ac[1] + bc[1]) // 2)
-        text = f"Dist: {result.target.distance_px:.1f}px | Angle: {result.target.direction_deg:.1f}°"
-        cv2.putText(img, text, (mid[0]-40, mid[1]),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 2)
+        cv2.putText(img, text, mid, cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 255, 255), 2)
+
+    if result.target_isis and result.aruco_isis:
+        ac = result.aruco_isis.center
+        bc = (result.target_isis.ball.x, result.target_isis.ball.y)
+        cv2.line(img, ac, bc, (255, 255, 0), 2)
+        text = f"I → {result.target_isis.color} | {result.target_isis.distance_px:.0f}px | {result.target_isis.direction_deg:.1f}°"
+        mid = ((ac[0] + bc[0]) // 2, (ac[1] + bc[1]) // 2)
+        cv2.putText(img, text, mid, cv2.FONT_HERSHEY_SIMPLEX, 0.45, (255, 255, 0), 2)
+
     return img
+
+# ---------------------------------------------------------------------------
+# Analysis Pipeline
+# ---------------------------------------------------------------------------
 
 def _save_detected_frame(frame: np.ndarray, folder: str = "detections") -> None:
     os.makedirs(folder, exist_ok=True)
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
     filename = f"{folder}/frame_{timestamp}.png"
     cv2.imwrite(filename, frame)
-    print(f"Frame enregistrée: {filename}")
+    print(f"Frame saved: {filename}")
 
 def analyze_frame(frame: np.ndarray, *, with_annotations: bool = True, save_detections: bool = False) -> AnalysisResult:
     balls = detect_balls(frame)
-    aruco = detect_aruco(frame)
-    target = find_nearest_ball(aruco.center, balls) if aruco else None
+    aruco_gabriel, aruco_isis = detect_arucos(frame)
+    target_gabriel = find_nearest_ball(aruco_gabriel.center, balls) if aruco_gabriel else None
+    target_isis = find_nearest_ball(aruco_isis.center, balls) if aruco_isis else None
 
-    result = AnalysisResult(balls=balls, aruco=aruco, target=target)
+    result = AnalysisResult(
+        balls=balls,
+        aruco_gabriel=aruco_gabriel,
+        aruco_isis=aruco_isis,
+        target_gabriel=target_gabriel,
+        target_isis=target_isis
+    )
 
     if with_annotations:
         result.annotated = _draw_annotations(frame, result)

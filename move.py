@@ -1,3 +1,4 @@
+""""
 # move.py — logique de mouvement basée sur la détection
 
 import os
@@ -100,3 +101,4 @@ def traball(angle=0, distance=7):
     
 
 
+""""
