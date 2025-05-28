@@ -65,8 +65,8 @@ class AnalysisResult:
 # ---------------------------------------------------------------------------
 
 _COLOR_THRESHOLDS = {
-    'red': [{'lower': np.array([0, 120, 70]), 'upper': np.array([30, 255, 255])}],
-    'blue': [{'lower': np.array([100, 50, 40]), 'upper': np.array([240, 255, 255])}]
+    'red': [{'lower': np.array([0, 30, 70]), 'upper': np.array([30, 255, 255])}],
+    'blue': [{'lower': np.array([80, 50, 5]), 'upper': np.array([230, 255, 250])}]
 }
 
 _ARUCO_DICT = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_6X6_1000)
@@ -299,26 +299,30 @@ def find_nearest_ball_with_line_of_sight(aruco_center: Tuple[int, int], balls: D
 
 def find_nearest_ball(aruco_center: Tuple[int, int], balls: Dict[str, List[Ball]]) -> Optional[TargetInfo]:
     """
-    Find the nearest detected ball from an ArUco marker center (legacy function without line-of-sight check).
+    Find the nearest detected ball from an ArUco marker center (legacy function without line-of-sight check),
+    with vertical boundary at y=368. Only considers balls on the same side of the line as the marker.
     
     Args:
         aruco_center: (x, y) coordinates of the ArUco marker
         balls: Dictionary of detected balls
     
     Returns:
-        TargetInfo of the nearest ball, or None if no balls detected
+        TargetInfo of the nearest ball, or None if no valid balls are found
     """
     nearest = None
     min_dist = float('inf')
-    
+    marker_y = aruco_center[1]
+
     for color, blist in balls.items():
         for b in blist:
-            d = euclidean(aruco_center, (b.x, b.y))
-            if d < min_dist:
-                min_dist = d
-                direction = compute_direction(aruco_center, (b.x, b.y))
-                nearest = TargetInfo(color=color, ball=b, distance_px=d, direction_deg=direction)
-    
+            # Only consider balls on the same vertical side as the marker
+            if (marker_y < 368 and b.y < 368) or (marker_y >= 368 and b.y >= 368):
+                d = euclidean(aruco_center, (b.x, b.y))
+                if d < min_dist:
+                    min_dist = d
+                    direction = compute_direction(aruco_center, (b.x, b.y))
+                    nearest = TargetInfo(color=color, ball=b, distance_px=d, direction_deg=direction)
+
     return nearest
 
 # ---------------------------------------------------------------------------
@@ -430,13 +434,10 @@ def analyze_frame(frame: np.ndarray, *, with_annotations: bool = True, save_dete
     balls = detect_balls(frame)
     aruco_gabriel, aruco_isis = detect_arucos(frame)
     
-    # Choose which function to use for finding nearest balls
-    if use_line_of_sight:
-        target_gabriel = find_nearest_ball_with_line_of_sight(aruco_gabriel.center, balls, original_frame) if aruco_gabriel else None
-        target_isis = find_nearest_ball_with_line_of_sight(aruco_isis.center, balls, original_frame) if aruco_isis else None
-    else:
-        target_gabriel = find_nearest_ball(aruco_gabriel.center, balls) if aruco_gabriel else None
-        target_isis = find_nearest_ball(aruco_isis.center, balls) if aruco_isis else None
+    
+    
+    target_gabriel = find_nearest_ball(aruco_gabriel.center, balls) if aruco_gabriel else None
+    target_isis = find_nearest_ball(aruco_isis.center, balls) if aruco_isis else None
 
     result = AnalysisResult(
         balls=balls,
