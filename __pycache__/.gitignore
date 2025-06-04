@@ -1,0 +1,56 @@
+# === Python ===
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+*.log
+.env
+.venv/
+venv/
+env/
+*.db
+*.sqlite3
+*.ipynb_checkpoints
+
+# === IDEs ===
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# === OS files ===
+.DS_Store
+Thumbs.db
+
+# === EV3 specific ===
+# Compiled bytecode (Pybricks or ev3dev)
+*.rxe
+*.rbf
+*.elf
+*.bin
+
+# Pybricks generated files
+*.mpy
+
+# If syncing to EV3 with rsync or similar, ignore temporary sync files
+*.tmp
+*.bak
+
+# Files created on EV3 during runtime
+*.log
+*.data
+*.tmp
+*.csv
+
+# === Jupyter (if used) ===
+.ipynb_checkpoints/
+
+# === Virtual environments (common names) ===
+env/
+ENV/
+.venv/
