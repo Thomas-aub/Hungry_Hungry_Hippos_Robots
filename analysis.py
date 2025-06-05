@@ -285,14 +285,6 @@ def find_nearest_ball_with_line_of_sight(aruco_center: Tuple[int, int], balls: D
     
     for color, blist in balls.items():
         for b in blist:
-<<<<<<< HEAD
-            d = euclidean(aruco_center, (b.x, b.y))
-            if d < min_dist:
-                min_dist = d
-                direction = compute_direction(aruco_center, (b.x, b.y))
-                nearest = TargetInfo(color=color, ball=b, distance_px=d, direction_deg=direction)
-                
-=======
             ball_center = (b.x, b.y)
             
             # Check if there's a clear line of sight
@@ -331,7 +323,6 @@ def find_nearest_ball(aruco_center: Tuple[int, int], balls: Dict[str, List[Ball]
                     direction = compute_direction(aruco_center, (b.x, b.y))
                     nearest = TargetInfo(color=color, ball=b, distance_px=d, direction_deg=direction)
 
->>>>>>> 4f3112b5dda8e07b76950c7c8554ae7d31352700
     return nearest
 
 # ---------------------------------------------------------------------------

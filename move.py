@@ -90,12 +90,4 @@ def attraper():
         
 #dans le main analyser pour trouver la balle la plus proche et mettre libre a faux 
     
-    
-#le robot va vers la balle pdt 3s et pui s
-
-
-    
-    
-
-
-""""
+#le robot va vers la balle pdt 3s et puis

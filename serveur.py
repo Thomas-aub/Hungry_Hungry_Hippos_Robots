@@ -27,3 +27,6 @@ try:
 except KeyboardInterrupt:
     print("Arrêt serveur.")
     server.stop()
+
+
+#while ma distance a la ball est < ... j'avance
