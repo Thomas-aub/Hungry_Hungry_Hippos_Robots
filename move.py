@@ -70,10 +70,13 @@ ev3 = EV3Brick()
 
 motorL= Motor(Port.B,Direction.COUNTERCLOCKWISE )
 motorR= Motor(Port.D, Direction.COUNTERCLOCKWISE)
-
+motorP= Motor(Port.C, Direction.COUNTERCLOCKWISE)
 robot = DriveBase(motorR, motorL, wheel_diameter=56, axle_track=112)
 robot.settings(straight_speed=100, turn_rate=90)
 
+def pince():
+    motorP.straight(2000)
+    
 def distance(angle, distance):
     if(angle>180):
         motorR.run(angle)

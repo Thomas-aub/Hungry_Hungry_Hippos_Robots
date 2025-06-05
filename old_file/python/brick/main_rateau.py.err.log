@@ -1,6 +1,0 @@
-Server is ready.
-Waiting for a message...
-Traceback (most recent call last):
-  File "/home/robot/python/brick/main_rateau.py", line 185, in <module>
-  File "/home/robot/python/brick/main_rateau.py", line 166, in receiveMessage
-ValueError: invalid syntax for integer with base 10: ''

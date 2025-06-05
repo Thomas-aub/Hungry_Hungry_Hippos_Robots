@@ -21,7 +21,6 @@ def on_press(key):
         move.distance(0, -10000)
     elif key == keyboard.Key.left:
         move.distance(90, 10000)
-
     elif key == keyboard.Key.right:
         move.distance(-90, 10000)
 
