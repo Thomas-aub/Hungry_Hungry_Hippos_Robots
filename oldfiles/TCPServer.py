@@ -1,6 +1,7 @@
 import socket
 import threading
 from pynput import keyboard
+import move 
 
 end_server = False
 bind_ip = "0.0.0.0" # Replace this with your own IP address
@@ -15,13 +16,14 @@ print("Server is listening on %s:%d" % (bind_ip, bind_port))
 def on_press(key):
     global end_server
     if key == keyboard.Key.up:
-        print("UP PRESSED!")
+        move.distance(0, 10000)
     elif key == keyboard.Key.down:
-        print("DOWN PRESSED!")
+        move.distance(0, -10000)
     elif key == keyboard.Key.left:
-        print("LEFT PRESSED!")
+        move.distance(90, 10000)
     elif key == keyboard.Key.right:
-        print("RIGHT PRESSED!")
+        move.distance(-90, 10000)
+
     elif hasattr(key, "char") and key.char == 'q':
         print("QUIT PRESSED! Arrêt en cours")
         end_server = True
