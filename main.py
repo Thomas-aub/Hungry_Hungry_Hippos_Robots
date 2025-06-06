@@ -25,7 +25,6 @@ def main():
                     move.send(file)
                 """
                 cv2.imshow("Robot lab", annotated)
-
             if cv2.waitKey(1) & 0xFF in (ord("q"), ord("Q")):
                 break
 
