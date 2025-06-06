@@ -14,7 +14,22 @@ def clientHandler(client_socket):
         # si le serveur reçoit "stop" -> s'arrête
         if response.decode() == "stop":
             break
-        # TODO: Faire les cas "up", "down", "left", "right"
+        
+        if response.decode() == "up":
+            #TODO: ajouter le code pour que le robot avance tout droit
+            print("Robot moving forward")
+    
+        if response.decode() == "down":
+            #TODO: ajouter le code pour que le robot face demi-tour
+            print("Robot moving backward")
+            
+        if response.decode() == "left":
+            #TODO: ajouter le code pour que le robot tourne à gauche
+            print("Robot turning left")
+            
+        if response.decode() == "right":
+            #TODO: ajouter le code pour que le robot tourne à droite
+            print("Robot turning right")
         
     print("Fermeture du serveur")
     server.close()
