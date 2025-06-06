@@ -19,6 +19,10 @@ def main():
             if frame is not None:
                 result = analysis.analyze_frame(frame)
                 annotated = result.annotated
+                if(result.target_isis) :
+                    print("Deg :", result.target_isis.direction_deg)
+                if(result.target_isis):
+                    print("Distance :", result.target_isis.distance_px)
                 """"
                 file = move.generate(result)
                 if file:
