@@ -38,26 +38,32 @@ def clientHandler(client_socket):
     client_socket.send("ready".encode())
     
     while True:
+        print("Dans la boucle")
         response = client_socket.recv(1024)
         # si le serveur reçoit "stop" -> s'arrête
         if response.decode() == "stop":
+            print("STOOOP")
             break
         
         if response.decode() == "up":
+            print("avance")
             move_forward(150)
     
         if response.decode() == "down":
+            print("recule")
             move_backward(150)
             
         if response.decode() == "left":
+            print("gauche")
             turn_right(90)
             
         if response.decode() == "right":
+            print("droite")
             turn_left(90)
         
-    print("Client connected " + str(addr))
-    server.close()
+    print("Oupps il ferme")
     client_socket.close()
+    server.close()
 
 
 if __name__ == "__main__":
@@ -70,7 +76,9 @@ if __name__ == "__main__":
     client, addr = server.accept()
     print("Client connected " + str(addr))
     
+    clientHandler(client)
+    
     # Client gérer par un thread
-    client_handler = threading.Thread(target = clientHandler, args=(client,))
-    client_handler.start()
+    # client_handler = threading.Thread(target = clientHandler, args=(client,))
+    # client_handler.start()
     

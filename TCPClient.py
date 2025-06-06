@@ -25,11 +25,8 @@ def on_press(key):
         CLIENT.send("right".encode())
         print("RIGHT PRESSED!")
         
-    elif hasattr(key, "char") and (key.char == 'e' or key.char ==' E'):
-        print("EXIT PRESSED! Arrêt du server")
-        CLIENT.send("stop".encode())
-        
     elif hasattr(key, "char") and (key.char == 'q' or key.char ==' Q'):
+        CLIENT.send("stop".encode())
         print("QUIT PRESSED! Arrêt du client")
         return False
 
