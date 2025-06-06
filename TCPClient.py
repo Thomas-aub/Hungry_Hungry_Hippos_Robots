@@ -36,21 +36,21 @@ def on_press(key):
 if __name__ == "__main__":
     ### clientA -> gère la connection avec le robot A
     ### Si serveur sur le robot A ouvert, décommenté le code suivant
-    # clientA = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    # clientA.settimeout(1)
-    # clientA.connect((HOST_ROBOT_A, PORT))
-    # CLIENT = clientA
-    # print("Connection to ROBOT A server : %s:%d" % (HOST_ROBOT_A, PORT))
-    # response = clientA.recv(4096)
+    clientA = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    clientA.settimeout(1)
+    clientA.connect((HOST_ROBOT_A, PORT))
+    CLIENT = clientA
+    print("Connection to ROBOT A server : %s:%d" % (HOST_ROBOT_A, PORT))
+    response = clientA.recv(4096)
     
     ### clientB -> gère la connection avec le robot B
     ### Si serveur sur le robot B ouvert, décommenté le code suivant
-    clientB = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    clientB.settimeout(1)
-    clientB.connect((HOST_ROBOT_B, PORT))
-    CLIENT = clientB
-    print("Connection to ROBOT B server : %s:%d" % (HOST_ROBOT_B, PORT))
-    response = clientB.recv(4096)
+    # clientB = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    # clientB.settimeout(1)
+    # clientB.connect((HOST_ROBOT_B, PORT))
+    # CLIENT = clientB
+    # print("Connection to ROBOT B server : %s:%d" % (HOST_ROBOT_B, PORT))
+    # response = clientB.recv(4096)
     
     if response.decode() == "ready":
         print("Successful")

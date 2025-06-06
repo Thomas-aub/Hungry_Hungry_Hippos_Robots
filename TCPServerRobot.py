@@ -1,9 +1,37 @@
 #!/usr/bin/env python3
+from pybricks.hubs import EV3Brick
+from pybricks.ev3devices import Motor
+from pybricks.parameters import Port, Direction
+from pybricks.robotics import DriveBase
+from pybricks.tools import wait
 import socket
 import threading
 
 HOST = "0.0.0.0"
 PORT = 6543
+
+ev3 = EV3Brick()
+
+# Attention ici : on passe la direction en 2e argument, PAS "direction="
+motorL = Motor(Port.B, Direction.COUNTERCLOCKWISE)
+motorR = Motor(Port.D, Direction.COUNTERCLOCKWISE)
+
+# Paramétrage du châssis (wheel_diameter en mm, axle_track en mm)
+robot = DriveBase(motorR, motorL, wheel_diameter=56, axle_track=112)
+robot.settings(straight_speed=150, turn_rate=100)  # vitesses par défaut
+
+# Fonctions de déplacement
+def move_forward(distance_mm=150):
+    robot.straight(distance_mm)
+
+def move_backward(distance_mm=150):
+    robot.straight(-distance_mm)
+
+def turn_left(angle_deg=90):
+    robot.turn(-angle_deg)
+
+def turn_right(angle_deg=90):
+    robot.turn(angle_deg)
 
 def clientHandler(client_socket):
     # test si connection est prête
@@ -16,26 +44,20 @@ def clientHandler(client_socket):
             break
         
         if response.decode() == "up":
-            #TODO: ajouter le code pour que le robot avance tout droit
-            print("Robot moving forward")
+            move_forward(150)
     
         if response.decode() == "down":
-            #TODO: ajouter le code pour que le robot face demi-tour
-            print("Robot moving backward")
+            move_backward(150)
             
         if response.decode() == "left":
-            #TODO: ajouter le code pour que le robot tourne à gauche
-            print("Robot turning left")
+            turn_right(90)
             
         if response.decode() == "right":
-            #TODO: ajouter le code pour que le robot tourne à droite
-            print("Robot turning right")
+            turn_left(90)
         
-    print("Fermeture du serveur")
+    print("Client connected " + str(addr))
     server.close()
-    
     client_socket.close()
-    print("Connection closed")
 
 
 if __name__ == "__main__":
@@ -43,10 +65,11 @@ if __name__ == "__main__":
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server.bind((HOST, PORT))
     server.listen(5)
-    print("[ROBOT B] Server is listening on %s:%d" % (HOST, PORT))
+    print("[ROBOT A] Server is listening on %s:%d" % (HOST, PORT))
     
     client, addr = server.accept()
     print("Client connected " + str(addr))
+    
     # Client gérer par un thread
     client_handler = threading.Thread(target = clientHandler, args=(client,))
     client_handler.start()
