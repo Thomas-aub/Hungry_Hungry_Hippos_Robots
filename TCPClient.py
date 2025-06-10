@@ -5,7 +5,7 @@ from flux import UdpFrameReceiver
 import analysis
 import time
 
-HOST_ROBOT = "192.168.58.10"  # Adresse IP du robot
+HOST_ROBOT = "192.168.58.11"  # Adresse IP du robot
 PORT = 6543
 
 def main():
@@ -19,33 +19,57 @@ def main():
 
     CLIENT = clientA
     print("Connection to ROBOT A server : %s:%d" % (HOST_ROBOT, PORT))
-    response = clientA.recv(4096)
+
+    last_send_time = 0
 
     try:
         while True:
-            global end_server
-
             frame = rx.get_frame()
             if frame is not None:
                 result = analysis.analyze_frame(frame)
                 annotated = result.annotated
-
+                current_time = time.time()
                 if result.target_isis:
-                    if(result.target_isis.distance_px and result.target_isis.direction_deg) :
+                    if result.target_isis.distance_px and result.target_isis.direction_deg:
                         distance_px = result.target_isis.distance_px
                         angle_deg = result.target_isis.direction_deg
-                        if (distance_px and angle_deg) :
-                            if angle_deg >= 345 or angle_deg <= 15:         
-                                CLIENT.send("up".encode())
-                            elif 15 < angle_deg <= 180:
-                                CLIENT.send("right".encode())
+                        if distance_px and angle_deg:
+                            res = f"Distance: {distance_px}, Angle: {angle_deg}, Commande: "
 
-                            elif 180 < angle_deg < 345:
-                                CLIENT.send("left".encode())
-                           
+                            if current_time - last_send_time >= 0.3:
+                                if(distance_px < 20) :
+                                    res += "DOWN\n"
+                                    CLIENT.send("down".encode())
+                                    print(res)
+                                elif angle_deg >= 350 or angle_deg <= 10:
+                                    res += "UP\n"
+                                    CLIENT.send("up".encode())
+                                    print(res)
 
-                else:
-                    print("👀 Aucune cible détectée.")
+                                elif 10 < angle_deg <= 180:
+                                    CLIENT.send("left".encode())
+                                    res += "LEFT\n"
+                                    print(res)
+                                elif 180 < angle_deg < 350:
+                                    CLIENT.send("right".encode())
+                                    res += "RIGHT\n"
+                                    print(res)
+
+                                last_send_time = current_time
+                elif(current_time - last_send_time >= 5 and last_send_time > 0) :
+                    if( (current_time - last_send_time)%2 == 1) :
+                        print("Je suis perdu, je tourne à droite")
+                        CLIENT.send("right".encode())
+                    else :
+                        print("Je suis perdu, j'avance")
+                        CLIENT.send("up".encode())
+                elif(current_time - last_send_time >= 4):
+                    print("Je suis perdu, je tourne à droite")
+                    CLIENT.send("right".encode())
+                elif(current_time - last_send_time >= 4.5):
+                    print("Je suis perdu, j'avance")
+                    CLIENT.send("up".encode())
+
 
                 cv2.imshow("Robot lab", annotated)
 

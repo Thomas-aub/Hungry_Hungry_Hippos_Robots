@@ -66,7 +66,7 @@ class AnalysisResult:
 
 _COLOR_THRESHOLDS = {
     'red': [{'lower': np.array([0, 30, 70]), 'upper': np.array([30, 255, 255])}],
-    'blue': [{'lower': np.array([80, 50, 5]), 'upper': np.array([230, 255, 250])}]
+    'blue': [{'lower': np.array([80, 60, 50]), 'upper': np.array([150, 255, 250])}]
 }
 
 _ARUCO_DICT = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_6X6_1000)
@@ -118,45 +118,6 @@ def apply_arena_filter(frame: np.ndarray) -> np.ndarray:
     
     return filtered_frame
 
-# ---------------------------------------------------------------------------
-# Line-of-sight checking
-# ---------------------------------------------------------------------------
-
-def has_line_of_sight(frame: np.ndarray, start: Tuple[int, int], end: Tuple[int, int], 
-                      sample_points: int = 50) -> bool:
-    """
-    Check if there's a clear line of sight between two points by sampling points along the line
-    and verifying none of them are black pixels (0,0,0).
-    
-    Args:
-        frame: BGR image to check
-        start: Starting point (x, y)
-        end: Ending point (x, y)
-        sample_points: Number of points to sample along the line
-    
-    Returns:
-        True if line of sight is clear, False if blocked by black pixels
-    """
-    x1, y1 = start
-    x2, y2 = end
-    
-    # Generate points along the line using linear interpolation
-    for i in range(sample_points + 1):
-        t = i / sample_points
-        x = int(x1 + t * (x2 - x1))
-        y = int(y1 + t * (y2 - y1))
-        
-        # Check bounds
-        if 0 <= y < frame.shape[0] and 0 <= x < frame.shape[1]:
-            # Check if pixel is black (0,0,0)
-            pixel = frame[y, x]
-            if np.array_equal(pixel, [0, 0, 0]):
-                return False
-        else:
-            # Point is out of bounds, consider it blocked
-            return False
-    
-    return True
 
 # ---------------------------------------------------------------------------
 # Detection Logic
@@ -266,52 +227,33 @@ def compute_direction(origin: Tuple[int, int], target: Tuple[int, int]) -> float
     angle = math.degrees(math.atan2(dy, dx))
     return (angle + 360) % 360
 
-def find_nearest_ball_with_line_of_sight(aruco_center: Tuple[int, int], balls: Dict[str, List[Ball]], 
-                                        frame: np.ndarray) -> Optional[TargetInfo]:
-    """
-    Find the nearest detected ball from an ArUco marker center that has a clear line of sight
-    (no black pixels blocking the path).
-    
-    Args:
-        aruco_center: (x, y) coordinates of the ArUco marker
-        balls: Dictionary of detected balls
-        frame: BGR image to check for line of sight
-    
-    Returns:
-        TargetInfo of the nearest accessible ball, or None if no balls are accessible
-    """
-    nearest = None
-    min_dist = float('inf')
-    
-    for color, blist in balls.items():
-        for b in blist:
-            ball_center = (b.x, b.y)
-            
-            # Check if there's a clear line of sight
-            if has_line_of_sight(frame, aruco_center, ball_center):
-                d = euclidean(aruco_center, ball_center)
-                if d < min_dist:
-                    min_dist = d
-                    direction = compute_direction(aruco_center, ball_center)
-                    nearest = TargetInfo(color=color, ball=b, distance_px=d, direction_deg=direction)
-    
-    return nearest
 
-def find_nearest_ball(aruco_center: Tuple[int, int], balls: Dict[str, List[Ball]]) -> Optional[TargetInfo]:
+
+def find_nearest_ball(aruco_center: Tuple[int, int], balls: Dict[str, List[Ball]], aruco_corners: Optional[np.ndarray] = None) -> Optional[TargetInfo]:
     """
-    Find the nearest detected ball from an ArUco marker center (legacy function without line-of-sight check),
-    with vertical boundary at y=368. Only considers balls on the same side of the line as the marker.
+    Find the nearest detected ball from an ArUco marker center, considering the ArUco's orientation.
+    The angle is calculated between the ArUco's front direction and the ball.
     
     Args:
         aruco_center: (x, y) coordinates of the ArUco marker
         balls: Dictionary of detected balls
+        aruco_corners: Corners of the ArUco marker (shape: (4, 2)) for orientation
     
     Returns:
-        TargetInfo of the nearest ball, or None if no valid balls are found
+        TargetInfo of the nearest ball, with direction_deg relative to ArUco's front, or None if no valid balls are found
     """
     nearest = None
     min_dist = float('inf')
     marker_y = aruco_center[1]
+
+    if aruco_corners is not None:
+        # Define the front direction of the ArUco (vector from center to top-right corner)
+        # Corner order: top-left, top-right, bottom-right, bottom-left
+        front_corner = aruco_corners[1]  # Top-right corner
+        front_vector = np.array(front_corner) - np.array(aruco_center)
+    else:
+        # Fallback: Use positive X-axis as front if corners are not provided
+        front_vector = np.array([1, 0])
 
     for color, blist in balls.items():
         for b in blist:
@@ -320,11 +262,17 @@ def find_nearest_ball(aruco_center: Tuple[int, int], balls: Dict[str, List[Ball]
                 d = euclidean(aruco_center, (b.x, b.y))
                 if d < min_dist:
                     min_dist = d
-                    direction = compute_direction(aruco_center, (b.x, b.y))
-                    nearest = TargetInfo(color=color, ball=b, distance_px=d, direction_deg=direction)
+                    # Vector from ArUco center to ball
+                    ball_vector = np.array([b.x - aruco_center[0], b.y - aruco_center[1]])
+                    
+                    # Calculate angle between front_vector and ball_vector (in degrees)
+                    angle_rad = np.arctan2(front_vector[1], front_vector[0]) - np.arctan2(ball_vector[1], ball_vector[0])
+                    angle_deg = np.degrees(angle_rad)
+                    angle_deg = (angle_deg + 360) % 360  # Normalize to [0, 360)
+                    
+                    nearest = TargetInfo(color=color, ball=b, distance_px=d, direction_deg=angle_deg)
 
     return nearest
-
 # ---------------------------------------------------------------------------
 # Visualization
 # ---------------------------------------------------------------------------
@@ -391,21 +339,7 @@ def _draw_annotations(frame: np.ndarray, result: AnalysisResult) -> np.ndarray:
 # Analysis Pipeline
 # ---------------------------------------------------------------------------
 
-def _save_detected_frame(frame: np.ndarray, folder: str = "detections") -> None:
-    """
-    Saves annotated frame to disk with timestamp.
-    
-    Args:
-        frame: Image to save
-        folder: Folder to save images
-    """
-    os.makedirs(folder, exist_ok=True)
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
-    filename = f"{folder}/frame_{timestamp}.png"
-    cv2.imwrite(filename, frame)
-    print(f"Frame saved: {filename}")
-
-def analyze_frame(frame: np.ndarray, *, with_annotations: bool = True, save_detections: bool = False, 
+def analyze_frame(frame: np.ndarray, *, with_annotations: bool = True, 
                  use_arena_filter: bool = True, use_line_of_sight: bool = True) -> AnalysisResult:
     """
     Performs the full analysis pipeline on a frame:
@@ -424,32 +358,45 @@ def analyze_frame(frame: np.ndarray, *, with_annotations: bool = True, save_dete
     Returns:
         AnalysisResult containing all detections and optional annotated image
     """
-    # Keep original frame for line-of-sight checking
-    original_frame = frame.copy()
     
     # Apply arena filter first if enabled
     if use_arena_filter:
         frame = apply_arena_filter(frame)
     
     balls = detect_balls(frame)
-    aruco_gabriel, aruco_isis = detect_arucos(frame)
-    
-    
-    
-    target_gabriel = find_nearest_ball(aruco_gabriel.center, balls) if aruco_gabriel else None
-    target_isis = find_nearest_ball(aruco_isis.center, balls) if aruco_isis else None
+    # Detect ArUcos and get their corners
+    parameters = cv2.aruco.DetectorParameters()
+    detector = cv2.aruco.ArucoDetector(_ARUCO_DICT, parameters)
+    corners, ids, _ = detector.detectMarkers(frame)
 
+    marker_gabriel = None
+    marker_isis = None
+    gabriel_corners = None
+    isis_corners = None
+
+    if ids is not None:
+        ids = ids.flatten()
+        for i, marker_id in enumerate(ids):
+            center = corners[i][0].mean(axis=0)
+            center = tuple(map(int, center))
+            if marker_id == _ARUCO_ID_GABRIEL:
+                marker_gabriel = ArucoMarker(int(marker_id), center)
+                gabriel_corners = corners[i][0]  # Shape: (4, 2)
+            elif marker_id == _ARUCO_ID_ISIS:
+                marker_isis = ArucoMarker(int(marker_id), center)
+                isis_corners = corners[i][0]  # Shape: (4, 2)
+
+    # Find nearest balls with orientation
+    target_gabriel = find_nearest_ball(marker_gabriel.center, balls, gabriel_corners) if marker_gabriel else None
+    target_isis = find_nearest_ball(marker_isis.center, balls, isis_corners) if marker_isis else None
     result = AnalysisResult(
         balls=balls,
-        aruco_gabriel=aruco_gabriel,
-        aruco_isis=aruco_isis,
+        aruco_gabriel=marker_gabriel,
+        aruco_isis=marker_isis,
         target_gabriel=target_gabriel,
         target_isis=target_isis
     )
 
     if with_annotations:
         result.annotated = _draw_annotations(frame, result)
-    if save_detections and result.annotated is not None:
-        _save_detected_frame(result.annotated)
-
     return result
