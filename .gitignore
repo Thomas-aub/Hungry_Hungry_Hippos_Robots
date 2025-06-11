@@ -1,2 +1,51 @@
-*/_pycache_/
+# Fichiers Python compilés
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Environnements virtuels
+.env/
+.venv/
+env/
+venv/
+
+# Fichiers de logs et de debug
+*.log
+*.bak
+*.tmp
+
+# Paramètres IDE
+.vscode/
+.idea/
+*.swp
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+
+# Fichiers de test
+htmlcov/
+.coverage
+.tox/
+.nox/
+.pytest_cache/
+
+# Paramètres système et OS
 .DS_Store
+Thumbs.db
+
+# Fichiers de déploiement ev3dev (ex: scp ou rsync)
+*.rpy
+*.ev3dev
+
+# Configuration perso
+config.json
+secrets.json
+
+# Scripts de transfert ou de test locaux
+deploy.sh
+run_on_ev3.sh
+
+# Notebook Jupyter éventuels
+*.ipynb_checkpoints
