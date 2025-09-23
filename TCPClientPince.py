@@ -87,7 +87,7 @@ def main():
                     else :
                         print("Je suis perdu, j'avance")
                         CLIENT.send("up".encode())
-                elif(current_time - last_send_time >= 4):
+                elif(current_time - last_send_time >= 4 and current_time - last_send_time <= 4.5):
                     print("Je suis perdu, je tourne à droite")
                     CLIENT.send("right".encode())
                 elif(current_time - last_send_time >= 4.5):

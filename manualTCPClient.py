@@ -2,7 +2,7 @@
 import socket
 from pynput import keyboard
 
-HOST_ROBOT_A = "192.168.58.10" #robot avec la pelle
+HOST_ROBOT_A = "192.168.58.11" #robot avec la pelle
 HOST_ROBOT_B = "192.168.58.11" #long robot
 PORT = 6543
 CLIENT = None
@@ -24,6 +24,11 @@ def on_press(key):
     elif key == keyboard.Key.right:
         CLIENT.send("right".encode())
         print("RIGHT PRESSED!")
+        
+    elif hasattr(key, "char") and (key.char == 's' or key.char ==' S'):
+        CLIENT.send("arret".encode())
+        print("QUIT PRESSED! Arrêt du client")
+        return False
         
     elif hasattr(key, "char") and (key.char == 'q' or key.char ==' Q'):
         CLIENT.send("stop".encode())
@@ -53,5 +58,3 @@ if __name__ == "__main__":
         print("Successful")
         
     with keyboard.Listener(on_press=on_press) as listener: listener.join()
-       
-    
