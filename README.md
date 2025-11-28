@@ -1,6 +1,4 @@
-Voici un README en anglais pour présenter votre projet :  
 
----
 
 # 🦛 Hungry Hippos Robot Game  
 
